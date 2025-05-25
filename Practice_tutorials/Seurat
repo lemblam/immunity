@@ -6,10 +6,9 @@ install.packages('hdf5r')
 library(Seurat)
 library(tidyverse)
 
-setwd("/Users/adrianchan/Desktop/GettingStarted_scRNASeq/data")
 W10 <- Read10X_h5("W10_filtered_feature_bc_matrix.h5")
 #List files 
-files <- list.files(path="/Users/adrianchan/Desktop/GettingStarted_scRNASeq/data",recursive=T,pattern="*.h5")
+files <- list.files(path="../GettingStarted_scRNASeq/data",recursive=T,pattern="*.h5")
 
 #Create a list of count matrices
 h5_read <- lapply(paste0("", files), Read10X_h5)
@@ -76,7 +75,7 @@ adp@meta.data %>%
   theme(plot.title = element_text(hjust=0.5, face="bold")) +
   ggtitle("Number of Cells per Sample")
 
-saveRDS(adp,"/Users/adrianchan/Desktop/GettingStarted_scRNASeq/merged_Seurat_adp.rds")
+saveRDS(adp,"../GettingStarted_scRNASeq/merged_Seurat_adp.rds")
 library(ggplot2)
 install.packages("patchwork")
 install.packages("devtools")
@@ -93,7 +92,7 @@ library(patchwork) # for plotting
 library(presto) # for differential expression
 library(glmGamPoi) # for sctransform
 library(ggplot2)
-adp <- readRDS("/Users/adrianchan/Desktop/GettingStarted_scRNASeq/merged_Seurat_adp.rds")
+adp <- readRDS("../GettingStarted_scRNASeq/merged_Seurat_adp.rds")
 adp[["percent.mt"]] <- PercentageFeatureSet(adp, pattern = "^mt-")
 adp@meta.data
 metadata <- adp@meta.data
@@ -187,7 +186,7 @@ adp_filt <- RunUMAP(adp_filt,dims = 1:30)
 DimPlot(adp_filt, reduction = "umap", group.by = c("orig.ident", "seurat_clusters","time_point","condition","cond_tp"),
         alpha=0.4, ncol=2)
 
-saveRDS(adp_filt, "/Users/adrianchan/Desktop/GettingStarted_scRNASeq/adp_merge_filt_sctran_clust0.1.rds")
+saveRDS(adp_filt, "../GettingStarted_scRNASeq/adp_merge_filt_sctran_clust0.1.rds")
 
 adp_filt<-PrepSCTFindMarkers(adp_filt,verbose=T)
 
@@ -235,7 +234,7 @@ library(SingleR) # for cell type annotation; Bioconductor
 library(celldex) # for cell type annotation reference; Bioconductor
 library(MAST) # for differential expression; Bioconductor
 
-adp <- readRDS("/Users/adrianchan/Desktop/GettingStarted_scRNASeq/adp_merge_filt_sctran_clust0.1.rds")
+adp <- readRDS("../GettingStarted_scRNASeq/adp_merge_filt_sctran_clust0.1.rds")
 mem.maxVSize()
 
 glimpse(adp)
