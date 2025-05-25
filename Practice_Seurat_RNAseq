@@ -1,3 +1,6 @@
+# Adapted from: https://github.com/hbctraining/Intro-to-scRNAseq
+# Original author: @mistrm82
+
 install.packages("Seurat")
 install.packages('hdf5r')
 library(Seurat)
@@ -163,8 +166,213 @@ t6<- metadata |> filter(time_point=="Day 6", nFeature_RNA > 350,
 keep<-c(t0,t6)
 
 # use different parameters; established above
-adp_filt<-subset(adp, cells=keep)
-
+adp_filt<-filt(adp, cells=keep)
+adp_filt <- filt(adp_filt, cells = sample(colnames(adp), 10000))
 saveRDS(adp_filt,"/Users/adrianchan/Desktop/GettingStarted_scRNASeq/adp_merge_filt.rds")
 
 adp_filt <- SCTransform(adp_filt, vars.to.regress = "percent.mt", verbose = FALSE)
+
+adp_filt <- RunPCA(adp_filt, verbose = FALSE,assay="SCT")
+
+# dimensions 1 to 9
+DimHeatmap(adp_filt, dims = 1:9, cells = 500, balanced = TRUE,ncol=3)
+DimHeatmap(adp_filt, dims = 20:30, cells = 500, balanced = TRUE,ncol=3)
+
+ElbowPlot(adp_filt, ndims = 40)
+
+adp_filt <- FindNeighbors(adp_filt, dims = 1:30)
+adp_filt <- FindClusters(adp_filt, resolution = 0.1)
+adp_filt <- RunUMAP(adp_filt,dims = 1:30)
+
+DimPlot(adp_filt, reduction = "umap", group.by = c("orig.ident", "seurat_clusters","time_point","condition","cond_tp"),
+        alpha=0.4, ncol=2)
+
+saveRDS(adp_filt, "/Users/adrianchan/Desktop/GettingStarted_scRNASeq/adp_merge_filt_sctran_clust0.1.rds")
+
+adp_filt<-PrepSCTFindMarkers(adp_filt,verbose=T)
+
+adp_filt_markers <- FindAllMarkers(adp_filt, only.pos = TRUE)
+
+#ordering the results
+adp_filt_markers <- adp_filt_markers %>% 
+  arrange(cluster,desc(avg_log2FC), desc(p_val_adj))
+
+#examine a small filt
+adp_filt_markers %>%
+  group_by(cluster) %>%
+  slice_max(n = 5, order_by = avg_log2FC)
+
+top20<-adp_filt_markers %>%
+  group_by(cluster) %>%
+  dplyr::filter(avg_log2FC > 1) %>%
+  slice_head(n = 20) %>%
+  ungroup() 
+DoHeatmap(adp_filt, features = top20$gene) + NoLegend()
+
+mem.maxVSize()
+#[1] 16384
+mem.maxVSize(vsize=16384*4)
+#[1] 65536
+
+#contaminants
+contam=c("Ptprc", "Plp1", "Pecam1")
+#beige adipocytes
+beige=c("Ucp1","Ppargc1a","Elovl3","Cidea")
+#preadipocytes
+preadip<-c('Mmp3', 'Cd142', 'Itgb1')
+#proliferating
+prolif<-'Mki67'
+#differentiating adipocytes
+diffadip<-c('Col5a3', 'Serpina3n')
+
+VlnPlot(adp_filt, features=contam)
+FeaturePlot(adp_filt,features=contam)
+
+BiocManager::install("SingleR")
+BiocManager::install("celldex")
+BiocManager::install("MAST")
+library(SingleR) # for cell type annotation; Bioconductor
+library(celldex) # for cell type annotation reference; Bioconductor
+library(MAST) # for differential expression; Bioconductor
+
+adp <- readRDS("/Users/adrianchan/Desktop/GettingStarted_scRNASeq/adp_merge_filt_sctran_clust0.1.rds")
+mem.maxVSize()
+
+glimpse(adp)
+
+table(adp$cond_tp)
+
+table(adp$cond_tp,adp$orig.ident)
+DimPlot(adp, reduction = "umap", group.by = c("orig.ident", "seurat_clusters","time_point","condition","cond_tp"),
+        alpha=0.4, ncol=2)
+
+adp = PrepSCTFindMarkers(adp)
+
+Idents(adp) = "SCT_snn_res.0.1"
+table(Idents(adp))
+
+DefaultAssay(adp) = "SCT"
+
+de_allClusters = FindAllMarkers(adp, test.use="wilcox", min.pct=0.1, only.pos=TRUE)
+
+head(de_allClusters)
+
+nrow(de_allClusters)
+
+top5PerCluster = matrix(ncol=7)
+colnames(top5PerCluster) = colnames(de_allClusters)
+for (i in 0:7){
+  top5PerCluster = rbind(top5PerCluster, head(de_allClusters[which(de_allClusters$cluster==i),], 5))
+}
+top5PerCluster=top5PerCluster[-1,]
+top5PerCluster
+
+DoHeatmap(adp,features = top5PerCluster$gene,slot="scale.data")
+
+Idents(adp) = "time_point"
+table(Idents(adp))
+
+day6_day0_de=FindMarkers(adp,ident.1="Day 6",ident.2="Day 0",test.use="wilcox")
+head(day6_day0_de, 10)
+
+fig1 = DimPlot(adp,group.by="time_point")
+fig2 = FeaturePlot(adp,features="Acta2",order=T)
+fig3 = FeaturePlot(adp,features="Cd36",order=T)
+
+fig1/(fig2|fig3)
+
+pseudo_adp=AggregateExpression(adp,assays="RNA", return.seurat=T, group.by=c("orig.ident","time_point","condition","cond_tp"))
+
+head(pseudo_adp@assays$RNA$counts)
+
+pseudo_adp@meta.data
+
+#just to clean up the look a little bit
+pseudo_adp = RenameCells(pseudo_adp,new.names=gsub("_.*","",pseudo_adp$orig.ident))
+pseudo_adp$orig.ident=gsub("_.*","",pseudo_adp$orig.ident)
+head(pseudo_adp@assays$RNA$counts)
+
+pseudo_adp@meta.data
+
+BiocManager::install("DESeq2")
+library(DESeq2)
+Idents(pseudo_adp)="time_point"
+bulk_adp_de = FindMarkers(pseudo_adp, ident.1="Day 6", ident.2="Day 0", test.use="DESeq2")
+head(bulk_adp_de)
+
+scDE.genes = rownames(day6_day0_de)[which(day6_day0_de$p_val_adj<0.05)]
+bulkDE.genes = rownames(bulk_adp_de)[which(bulk_adp_de$p_val_adj<0.05)]
+length(scDE.genes)
+
+length(bulkDE.genes)
+
+length(intersect(scDE.genes,bulkDE.genes))
+
+bulk_adp_de[c("Acta2","Cd36"),]
+
+Idents(adp)="SCT_snn_res.0.1"
+DotPlot(adp,features=unique(top5PerCluster$gene),dot.scale = 3)+coord_flip()
+
+Idents(adp) = "time_point"
+VlnPlot(adp,features=c("Acta2","Cd36"),alpha = 0.1)
+
+markers=c("Mmp3","Mki67","Fabp4","Scd1","Ucp1","Ppargc1a","Elovl3","Cidea")
+Idents(adp)="SCT_snn_res.0.1"
+avgExp = AverageExpression(adp,markers,assay="SCT")$SCT
+
+avgExp
+
+DimPlot(adp,label=T)
+
+FeaturePlot(adp,features=markers,ncol=3,order=T)
+
+adipocyte=vector(length=ncol(adp))
+adipocyte[which(adp$SCT_snn_res.0.1 %in% c(0,5))]="Preadipocytes"
+adipocyte[which(adp$SCT_snn_res.0.1 %in% c(2,6))]="Proliferating cells"
+adipocyte[which(adp$SCT_snn_res.0.1 %in% c(1,3))]="Differentiating beige adipocytes"
+adipocyte[which(adp$SCT_snn_res.0.1 %in% c(4))]="Differentiated beige adipocytes"
+adp$adipocyte = adipocyte
+
+f1 = DimPlot(adp,group.by="SCT_snn_res.0.1",label=T) + NoLegend()
+f2 = DimPlot(adp,group.by="time_point") + NoLegend()
+f3 = DimPlot(adp,group.by="adipocyte",label=T)+NoLegend()
+
+(f1|f2)/f3
+
+adp.sce = as.SingleCellExperiment(adp,assay="SCT") #This selects *only* the SCT assay
+mouseRNASeq = celldex::MouseRNAseqData()
+head(mouseRNASeq)
+
+table(mouseRNASeq$label.main)
+
+table(mouseRNASeq$label.fine)
+
+annot = SingleR(test=adp.sce, ref=mouseRNASeq, labels=mouseRNASeq$label.main)
+head(annot)
+
+table(annot$pruned.labels, useNA="ifany") #useNA can be used turned on in the `table` function
+
+adp$mouseRNASeq.main=annot$pruned.labels
+
+annotFig1 = DimPlot(adp,group.by="adipocyte",label=T)+NoLegend()
+annotFig2 = DimPlot(adp,group.by="mouseRNASeq.main")
+
+annotFig1|annotFig2
+
+Idents(adp)="SCT_snn_res.0.1" #Assign clusters as the identities
+avgExp = AverageExpression(adp, assays="SCT")$SCT #Run AverageExpression on the SCT assay and return only SCT
+clustAnnot=SingleR(test=avgExp, ref=mouseRNASeq, labels=mouseRNASeq$label.main) #Run SingleR on the averaged expression matrix
+clustAnnot
+
+clustLabels = as.vector(clustAnnot$pruned.labels) #retrieve only the cluster-derived annotations
+names(clustLabels) = c(0:6) #assign the cluster numbers as the annotations
+clustLabels.vect = clustLabels[match(adp$SCT_snn_res.0.1, names(clustLabels))] #match the cluster identities per cell in the Seurat data to the cluster labels
+names(clustLabels.vect) = colnames(adp) #ensure that the cluster identities are assigned the cell names
+adp$mouseRNASeq.main.clust = clustLabels.vect #add the cluster annotations to the vector
+
+clustAnnotFig1 = DimPlot(adp,group.by="SCT_snn_res.0.1",label=T)+NoLegend()
+clustAnnotFig2 = DimPlot(adp,group.by="adipocyte",label=T)+NoLegend()
+clustAnnotFig3 = DimPlot(adp,group.by="mouseRNASeq.main")
+clustAnnotFig4 = DimPlot(adp,group.by="mouseRNASeq.main.clust")
+
+(clustAnnotFig1|clustAnnotFig2)/(clustAnnotFig3|clustAnnotFig4)
