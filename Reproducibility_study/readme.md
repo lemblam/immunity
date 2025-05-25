@@ -1,0 +1,2 @@
+Using Seurat to reproduce key figures from the paper "Targeted therapy guided by single-cell transcriptomic analysis in drug-induced hypersensitivity syndrome: a case report" 
+Kim, D., Kobayashi, T., Voisin, B. et al. Targeted therapy guided by single-cell transcriptomic analysis in drug-induced hypersensitivity syndrome: a case report. Nat Med 26, 236–243 (2020). https://doi.org/10.1038/s41591-019-0733-7
