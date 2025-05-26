@@ -1,0 +1,7 @@
+library(Seurat)
+library(dplyr) # data manipulation
+library(ggplot2)
+library(patchwork)
+# install.packages('BiocManager')
+# BiocManager::install('limma')
+library(limma) # optional
